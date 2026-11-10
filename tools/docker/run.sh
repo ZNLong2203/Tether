@@ -9,9 +9,12 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 SDP="${QNX_SDP_HOST:-$HOME/qnx800}"
 [ -d "$SDP" ] || { echo "QNX SDP not found at $SDP (set QNX_SDP_HOST)"; exit 1; }
 mkdir -p "$HOME/.qnx"
-exec docker run --rm -it --platform linux/amd64 \
+# -t only when a terminal is attached, so the script also works from CI and tools.
+TTY=(); [ -t 0 ] && TTY=(-it)
+[ $# -gt 0 ] || set -- /bin/bash -l
+exec docker run --rm ${TTY[@]+"${TTY[@]}"} --platform linux/amd64 \
   -v "$REPO":/work \
   -v "$SDP":/opt/qnx800:ro \
   -v "$HOME/.qnx":/home/"$(id -un)"/.qnx \
   -w /work \
-  tether-qnx "${@:-/bin/bash -l}"
+  tether-qnx "$@"
