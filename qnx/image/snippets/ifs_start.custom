@@ -1,0 +1,5 @@
+# Commands run from the IFS start-up script before the main start-up script.
+#
+# sshd looks for its authentication helper at /usr/libexec/sshd-auth. The helper
+# is installed in /system/bin (system_files.custom), so link the expected path.
+    procmgr_symlink /system/bin/sshd-auth /usr/libexec/sshd-auth

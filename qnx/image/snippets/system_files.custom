@@ -1,0 +1,6 @@
+# Files added to the system partition (mkqnximage local/snippets/system_files.custom).
+#
+# OpenSSH 10 splits authentication into a third program, sshd-auth. The SDP ships
+# it but mkqnximage's own file list does not include it, so sshd refuses to start
+# ("/usr/libexec/sshd-auth does not exist"). See ifs_start.custom for the path.
+bin/sshd-auth=usr/libexec/sshd-auth
