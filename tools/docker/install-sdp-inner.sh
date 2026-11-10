@@ -18,7 +18,7 @@ OPTS=/secrets/qsc.opts
 say() { printf '\n== %s\n' "$*" | tee -a "$LOG"; }
 
 # 1. QNX Software Center. The installer shows the licence and asks y/n itself.
-if [ ! -x "$CLT" ]; then
+if [ "${MODE:-full}" = full ] && [ ! -x "$CLT" ]; then
   say "Installing QNX Software Center (you will be asked to accept the licence)"
   bash "/inst/$INSTALLER" disable-auto-start "$QSC_ROOT" || { echo "QSC install did not finish"; exit 1; }
 fi
@@ -34,6 +34,12 @@ unset MQ_PASS MQ_USER
 trap 'rm -f "$OPTS"' EXIT
 
 clt() { "$CLT" "@$OPTS" "$@" 2>&1 | tee -a "$LOG"; return "${PIPESTATUS[0]}"; }
+
+if [ "${MODE:-full}" = packages ]; then
+  say "installing packages into $SDP: $PKGS"
+  clt -destination "$SDP" -installPackage "$PKGS"; rc=$?; echo "exit=$rc" | tee -a "$LOG"
+  exit $rc
+fi
 
 say "1/4 mirror metadata"
 clt -mirror; rc=$?; echo "exit=$rc" | tee -a "$LOG"
