@@ -32,6 +32,10 @@ not load for our tools, so read it yourself before submitting):
 - The Submission Period runs from 2 November to 15 December 2026.
 - It does not have to be about your hackathon project.
 
+## Status
+
+Pull request opened: <https://github.com/qnx/codelabs/pull/73>. It was **not** previewed with `claat` before opening (the build tool was not run), so look at the rendered page once it is available and push fixes to the same branch if needed.
+
 ## How to publish it
 
 QNX publishes codelabs from the public repository
