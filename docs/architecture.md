@@ -69,6 +69,19 @@ returns the status given to `MsgReply()`.
 
 The wire format is in [`core/include/tether/proto.h`](../core/include/tether/proto.h).
 
+### Calls into the AI go through a helper thread
+`TimerTimeout()` puts a deadline on a blocking call, but it cannot release a client that is
+*reply-blocked* on a server whose channel was created with `_NTO_CHF_UNBLOCK`: the kernel sends the
+server an unblock pulse and waits for the server to answer it. `name_attach()` and resource managers
+always create their channels that way. So a server that receives a message and then goes silent keeps
+its client stuck, whatever deadline the client set.
+
+For the trusted arbiter that is acceptable. For the AI it is not, because the dashboard calls the AI's
+control channel and the AI is the one server we cannot make answer. The gateway therefore sends every
+call to the AI through one helper thread, and the caller gives up after 400 ms while the helper stays
+stuck. Later calls fail at once until the helper is free. `tools/qemu/gateway-test.sh` checks this with
+a server that never replies.
+
 ### Threads and priorities
 
 | Priority | Thread | Why there |

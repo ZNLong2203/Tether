@@ -15,8 +15,12 @@
  *   POST /api/model?name=X    hot-swap the AI's model (models/X.tmlp)
  *   POST /api/reset           start a new latency window
  *
- * Every call that talks to another process has a deadline, so a hung AI can
- * slow one request down but never wedge the gateway. There is no
+ * Calls into the trusted processes (the arbiter) carry a TimerTimeout deadline.
+ * Calls into the AI go through one helper thread instead: a deadline cannot
+ * release a client that is reply-blocked on a server whose channel asked for
+ * unblock notifications (every name_attach and resource-manager channel does)
+ * unless that server answers, and the AI is the one server we cannot make
+ * answer. If it stalls, only the helper is stuck; the gateway keeps serving. There is no
  * authentication: this is a lab demo, reach it only through the forwarded
  * localhost port. POST needs the header "X-Tether: 1", which a web page on
  * another origin cannot add without a preflight we do not answer.
@@ -59,6 +63,121 @@ static long send_to(const char *name, const void *msg, size_t n, void *reply, si
     TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_SEND | _NTO_TIMEOUT_REPLY, NULL, &to, NULL);
     long r = MsgSend(coid, msg, n, reply, rn);
     name_close(coid);
+    return r;
+}
+
+/* ---- calls into the AI, through a helper thread ---------------------------- */
+
+#define AI_WAIT_NS (400 * TETHER_NS_PER_MS)
+#define AI_BUF 256
+
+static struct {
+    pthread_mutex_t mu;
+    pthread_cond_t wake, done;
+    int pending;    /* a request waits for the helper */
+    int busy;       /* the helper owns the job (it may be stuck inside MsgSend) */
+    int finished;   /* the helper completed it and the caller is still waiting */
+    int abandoned;  /* the caller gave up; the helper discards its answer */
+    char msg[AI_BUF], rep[AI_BUF];
+    size_t n, rn;
+    long result;
+    int err;
+} ai;
+
+static void *ai_helper(void *arg)
+{
+    (void)arg;
+    pthread_mutex_lock(&ai.mu);
+    for (;;) {
+        while (!ai.pending) pthread_cond_wait(&ai.wake, &ai.mu);
+        ai.pending = 0;
+        char msg[AI_BUF], rep[AI_BUF];
+        size_t n = ai.n, rn = ai.rn;
+        memcpy(msg, ai.msg, n);
+        pthread_mutex_unlock(&ai.mu);
+
+        /* No lock held: this may block for as long as the AI likes. */
+        long r = -1;
+        int e = ENOENT;
+        int coid = name_open(TETHER_AI_NAME, 0);
+        if (coid >= 0) {
+            uint64_t to = CALL_TIMEOUT_NS;
+            TimerTimeout(CLOCK_MONOTONIC, _NTO_TIMEOUT_SEND | _NTO_TIMEOUT_REPLY, NULL, &to, NULL);
+            r = MsgSend(coid, msg, n, rep, rn);
+            e = errno;
+            name_close(coid);
+        }
+
+        pthread_mutex_lock(&ai.mu);
+        if (ai.abandoned) {
+            ai.abandoned = 0;
+            ai.busy = 0;
+        } else {
+            if (r >= 0) memcpy(ai.rep, rep, rn);
+            ai.result = r;
+            ai.err = e;
+            ai.finished = 1;
+            pthread_cond_signal(&ai.done);
+        }
+    }
+    return NULL;
+}
+
+static void ai_init(void)
+{
+    pthread_condattr_t ca;
+    pthread_condattr_init(&ca);
+    pthread_condattr_setclock(&ca, CLOCK_MONOTONIC);
+    pthread_mutex_init(&ai.mu, NULL);
+    pthread_cond_init(&ai.wake, &ca);
+    pthread_cond_init(&ai.done, &ca);
+    pthread_t t;
+    pthread_create(&t, NULL, ai_helper, NULL);
+}
+
+/* Like send_to() for the AI. Returns the reply status, or -1 with errno:
+ * EBUSY if an earlier call is still stuck, ETIMEDOUT if this one is. */
+static long ai_call(const void *msg, size_t n, void *reply, size_t rn)
+{
+    if (n > AI_BUF || rn > AI_BUF) {
+        errno = EMSGSIZE;
+        return -1;
+    }
+    pthread_mutex_lock(&ai.mu);
+    if (ai.busy) {
+        pthread_mutex_unlock(&ai.mu);
+        errno = EBUSY;
+        return -1;
+    }
+    memcpy(ai.msg, msg, n);
+    ai.n = n;
+    ai.rn = rn;
+    ai.busy = 1;
+    ai.finished = 0;
+    ai.pending = 1;
+    pthread_cond_signal(&ai.wake);
+
+    struct timespec dl;
+    clock_gettime(CLOCK_MONOTONIC, &dl);
+    int64_t t = (int64_t)dl.tv_nsec + AI_WAIT_NS;
+    dl.tv_sec += t / TETHER_NS_PER_S;
+    dl.tv_nsec = t % TETHER_NS_PER_S;
+    while (!ai.finished) {
+        if (pthread_cond_timedwait(&ai.done, &ai.mu, &dl) == ETIMEDOUT) break;
+    }
+    long r;
+    if (ai.finished) {
+        r = ai.result;
+        errno = ai.err;
+        if (r >= 0) memcpy(reply, ai.rep, rn);
+        ai.busy = 0;
+        ai.finished = 0;
+    } else {
+        ai.abandoned = 1; /* the helper stays busy until the AI answers or dies */
+        r = -1;
+        errno = ETIMEDOUT;
+    }
+    pthread_mutex_unlock(&ai.mu);
     return r;
 }
 
@@ -172,7 +291,7 @@ static void route_status(int fd)
     static char body[20000], arb[8192], models[1024];
     static tether_status st;
     static int64_t ai_checked_ns;
-    static tether_ai_info ai;
+    static tether_ai_info ai_info;
     static int have_ai;
     tether_msg_hdr h = { TETHER_MSG_STATUS, 0, 0 };
     if (send_to(TETHER_ARBITER_NAME, &h, sizeof(h), &st, sizeof(st)) != (long)sizeof(st) ||
@@ -183,7 +302,7 @@ static void route_status(int fd)
     int64_t now = tether_now_ns();
     if (now - ai_checked_ns > 1 * TETHER_NS_PER_S) { /* AI info once a second at most */
         tether_msg_hdr ih = { TETHER_MSG_AI_INFO, 0, 0 };
-        have_ai = send_to(TETHER_AI_NAME, &ih, sizeof(ih), &ai, sizeof(ai)) == (long)sizeof(ai);
+        have_ai = ai_call(&ih, sizeof(ih), &ai_info, sizeof(ai_info)) == (long)sizeof(ai_info);
         ai_checked_ns = now;
     }
     tether_hw_status hw;
@@ -200,9 +319,9 @@ static void route_status(int fd)
         n += snprintf(body + n, sizeof(body) - (size_t)n,
                       "\"ai\":{\"model_id\":%u,\"fault\":\"%s\",\"proposals\":%llu,\"bypass_attempts\":%llu,"
                       "\"bypass_denied\":%llu,\"infer_p99_us\":%lld,\"infer_max_us\":%lld,\"pid\":%d,\"uid\":%d},",
-                      ai.model_id, tether_fault_name((tether_fault)ai.fault), (unsigned long long)ai.proposals,
-                      (unsigned long long)ai.bypass_attempts, (unsigned long long)ai.bypass_denied,
-                      (long long)(ai.infer_p99_ns / 1000), (long long)(ai.infer_max_ns / 1000), ai.pid, ai.uid);
+                      ai_info.model_id, tether_fault_name((tether_fault)ai_info.fault), (unsigned long long)ai_info.proposals,
+                      (unsigned long long)ai_info.bypass_attempts, (unsigned long long)ai_info.bypass_denied,
+                      (long long)(ai_info.infer_p99_ns / 1000), (long long)(ai_info.infer_max_ns / 1000), ai_info.pid, ai_info.uid);
     n += snprintf(body + n, sizeof(body) - (size_t)n, "\"control_hz\":%.0f,\"models\":%s,\"version\":\"%s\"}",
                   g_cfg.timing.control_hz, models, TETHER_VERSION);
     respond_json(fd, 200, body);
@@ -245,7 +364,7 @@ static void route_post(int fd, const char *path, const char *query)
         }
         tether_msg_fault m = { { TETHER_MSG_FAULT, 0, 0 }, (int32_t)f, 0 };
         tether_fault_reply rep;
-        long r = send_to(TETHER_AI_NAME, &m, sizeof(m), &rep, sizeof(rep));
+        long r = ai_call(&m, sizeof(m), &rep, sizeof(rep));
         snprintf(out, sizeof(out), "{\"ok\":%s,\"fault\":\"%s\"%s}", r == (long)sizeof(rep) && !rep.status ? "true" : "false",
                  tether_fault_name(f), r == (long)sizeof(rep) ? "" : ",\"error\":\"the AI process did not answer\"");
         respond_json(fd, 200, out);
@@ -285,7 +404,7 @@ static void route_post(int fd, const char *path, const char *query)
         m.hdr.type = TETHER_MSG_MODEL;
         snprintf(m.path, sizeof(m.path), "%s/%s.tmlp", g_models, v);
         tether_model_reply rep;
-        long r = send_to(TETHER_AI_NAME, &m, sizeof(m), &rep, sizeof(rep));
+        long r = ai_call(&m, sizeof(m), &rep, sizeof(rep));
         if (r != (long)sizeof(rep)) {
             respond_json(fd, 200, "{\"ok\":false,\"error\":\"the AI process did not answer\"}");
         } else {
@@ -378,6 +497,7 @@ int main(int argc, char **argv)
         qlog(TAG, "cannot listen on port %d: %s", port, strerror(errno));
         return 1;
     }
+    ai_init(); /* the helper thread is created while we may still do so */
     if (!keep_root) drop_privileges();
     q_set_fifo(TETHER_PRIO_BRIDGE);
     qlog(TAG, "listening on port %d", port);

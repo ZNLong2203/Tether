@@ -21,7 +21,7 @@ const T = [
  ['Message passing', 'The AI is always the client: MsgSend a proposal, get the observation back.', '50 proposals/s · 150 µs inference p99'],
  ['Disconnect pulse', 'The kernel tells the arbiter an AI process died. No polling.', 'AI disconnected (kernel disconnect pulse)'],
  ['SCHED_FIFO + timer pulses', 'Control loop at priority 60, AI at 20. A CPU-hogging AI cannot starve it.', 'CPU 99% busy · p99 1.91 ms vs 2.01 ms idle'],
- ['TimerTimeout', 'Every call from tools and the dashboard to another process has a deadline.', 'no answer from tether-ai: Connection timed out'],
+ ['TimerTimeout + helper thread', 'A silent server can keep a client stuck, so the AI is called through a helper.', 'silent AI: status page still answers in 8 ms'],
  ['Supervisor', 'posix_spawn, waitpid, SIGKILL: restart a crash, kill a hang.', 'AI silent for 1.2 s: killing pid …'],
  ['slog2 + mkqnximage', 'One image that boots straight into Tether, with structured logs.', 'dashboard answers ~12 s after boot'],
 ];
