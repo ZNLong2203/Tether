@@ -30,15 +30,7 @@ static void usage(void)
 
 static void set_lung(tether_lung *l, const char *name)
 {
-    tether_lung_defaults(l);
-    l->noise = 0.05;
-    if (strcmp(name, "ards") == 0) {
-        l->compliance = 0.025;
-        l->resistance = 12.0;
-    } else if (strcmp(name, "asthma") == 0) {
-        l->compliance = 0.045;
-        l->resistance = 25.0;
-    } else if (strcmp(name, "healthy") != 0) {
+    if (tether_lung_preset(l, name) != 0) {
         fprintf(stderr, "unknown lung '%s'\n", name);
         exit(2);
     }

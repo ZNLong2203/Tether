@@ -2,6 +2,7 @@
 #include "tether/plant.h"
 
 #include <math.h>
+#include <string.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -15,6 +16,24 @@ void tether_lung_defaults(tether_lung *lung)
     lung->effort_amp = 0.0;
     lung->effort_rr = 18.0;
     lung->noise = 0.0;
+}
+
+int tether_lung_preset(tether_lung *lung, const char *name)
+{
+    tether_lung_defaults(lung);
+    lung->noise = 0.05;
+    if (strcmp(name, "healthy") == 0) return 0;
+    if (strcmp(name, "ards") == 0) {
+        lung->compliance = 0.025;
+        lung->resistance = 12.0;
+        return 0;
+    }
+    if (strcmp(name, "asthma") == 0) {
+        lung->compliance = 0.045;
+        lung->resistance = 25.0;
+        return 0;
+    }
+    return -1;
 }
 
 void tether_plant_init(tether_plant *p, const tether_lung *lung, double peep, uint64_t seed)

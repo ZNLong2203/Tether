@@ -136,6 +136,17 @@ typedef struct {
     int32_t pad;
 } tether_hw_status;
 
+#ifdef __QNXNTO__
+#include <devctl.h>
+/* /dev/tether/sensor   (0444): READ_SENSOR, HW_STATUS
+ * /dev/tether/actuator (0600, root): SET_COMMAND
+ * /dev/tether/plant    (0600, root): SET_LUNG, HW_STATUS */
+#define DCMD_TETHER_READ_SENSOR __DIOF(_DCMD_MISC, 0x40, tether_hw_sensor)
+#define DCMD_TETHER_SET_COMMAND __DIOT(_DCMD_MISC, 0x41, tether_hw_command)
+#define DCMD_TETHER_HW_STATUS   __DIOF(_DCMD_MISC, 0x42, tether_hw_status)
+#define DCMD_TETHER_SET_LUNG    __DIOT(_DCMD_MISC, 0x43, tether_lung)
+#endif
+
 #ifdef __cplusplus
 }
 #endif

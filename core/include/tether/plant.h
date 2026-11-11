@@ -51,6 +51,10 @@ typedef struct {
 
 void tether_lung_defaults(tether_lung *lung);
 
+/* Named patients: "healthy", "ards" (stiff lung), "asthma" (high resistance),
+ * all with a little sensor noise. Returns 0, or -1 for an unknown name. */
+int tether_lung_preset(tether_lung *lung, const char *name);
+
 /* Start at equilibrium with the given PEEP applied. */
 void tether_plant_init(tether_plant *p, const tether_lung *lung, double peep, uint64_t seed);
 
