@@ -55,6 +55,7 @@ static struct {
     int n_hogs;
     pthread_t hog[MAX_HOGS];
     _Atomic int hog_run;
+    _Atomic int ctl_ready; /* set once the control name is attached: privileges may be dropped */
     pthread_mutex_t hog_mu;
     pthread_cond_t hog_cv;
 } g;
@@ -119,8 +120,10 @@ static void *control_thread(void *arg)
     name_attach_t *att = name_attach(NULL, TETHER_AI_NAME, 0);
     if (att == NULL) {
         qlog(TAG, "name_attach %s failed: errno %d", TETHER_AI_NAME, errno);
+        atomic_store(&g.ctl_ready, -1);
         return NULL;
     }
+    atomic_store(&g.ctl_ready, 1);
     static ctl_msg msg;
     for (;;) {
         struct _msg_info info;
@@ -386,7 +389,13 @@ int main(int argc, char **argv)
     g.n_hogs = ncpu < 1 ? 1 : (ncpu > MAX_HOGS ? MAX_HOGS : (int)ncpu);
     for (int i = 0; i < g.n_hogs; i++) pthread_create(&g.hog[i], &at, hog_thread, NULL);
     q_set_fifo(TETHER_PRIO_AI);
-    usleep(100 * 1000); /* let the control thread attach its name before we lose PATHSPACE */
+    /* The control thread must have attached its name before we give up the
+     * right to create one. Wait for its signal, not for a guessed delay. */
+    for (int i = 0; i < 500 && atomic_load(&g.ctl_ready) == 0; i++) usleep(10 * 1000);
+    if (atomic_load(&g.ctl_ready) != 1) {
+        qlog(TAG, "control channel is not up; refusing to continue");
+        return 1;
+    }
 
     if (drop) drop_privileges(uid, gid);
     else qlog(TAG, "running as uid %d: NO privilege drop (demo)", (int)geteuid());

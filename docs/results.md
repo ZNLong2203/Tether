@@ -29,25 +29,35 @@ while the QNX kernel starts.
 
 ## Pass/fail checks on the live system
 
-`tools/qemu/selftest.sh` — 21 checks, all pass:
+`tools/qemu/selftest.sh` — 29 checks, all pass:
 
 ```
 PASS  uid 2002 cannot open /dev/tether/actuator
 PASS  hardware counted the refused open
+PASS  uid 2002 refused 5 of 5 operator actions (guard, fault, reset, model swap, lung)
+PASS  none of them changed anything: the AI is still in control
 PASS  spike:  arbiter switched to SAFE (reason range)              and the AI was readmitted
 PASS  nan:    arbiter switched to SAFE (reason non-finite)         and the AI was readmitted
 PASS  stuck:  arbiter switched to SAFE (reason expiration-pressure) and the AI was readmitted
 PASS  drift:  arbiter switched to SAFE (reason predicted-overdistension) and the AI was readmitted
-PASS  bypass: 300 opens refused by the OS in 6 s
-PASS  hog:    control loop kept running (2015 ticks in 8 s, 250 Hz)
+PASS  bypass: 298 opens refused by the OS in 6 s
+PASS  hog:    control loop kept running (2028 ticks in 8 s, 250 Hz)
 PASS  crash:  supervisor brought the AI back; AI back in control
 PASS  hang:   supervisor brought the AI back; AI back in control
-PASS  guard off + spike: 1231 ticks over the envelope (shows what Tether prevents)
+PASS  guard off + spike: 1249 ticks over the envelope (shows what Tether prevents)
 PASS  model swapped to vent-unvalidated
 PASS  unvalidated model: no violation in 20 s
 PASS  swapped back to vent-v1, AI readmitted
+PASS  ards:   AI in control, tidal volume 0.4165 L, estimated R=11.91 C=0.0250   (true 12 / 0.025)
+PASS  asthma: AI in control, tidal volume 0.3820 L, estimated R=26.19 C=0.0435   (true 25 / 0.045)
+PASS  healthy: AI in control, tidal volume 0.4136 L, estimated R=9.95 C=0.0500   (true 10 / 0.05)
 PASS  no envelope violation outside the deliberate guard-off test
+PASS  tether-arbiter killed: supervisor restarted everything, AI back in control
+PASS  tether-hw killed:      supervisor restarted everything, AI back in control
+PASS  tether-bridge killed:  restarted on its own
 ```
+
+(Some lines above merge two checks, for example a fault and the AI's readmission after it.)
 
 The guard-off test is the control experiment: with the arbiter passing the AI's output straight to
 the blower, the same `spike` fault breaks the limits. Violations are ticks on which the *measured*

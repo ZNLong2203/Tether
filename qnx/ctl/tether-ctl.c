@@ -57,7 +57,8 @@ static int send_named(const char *name, const void *msg, size_t n, void *reply, 
     int e = errno;
     name_close(coid);
     if (r < 0) {
-        fprintf(stderr, "no answer from %s: %s\n", name, strerror(e));
+        if (e == EPERM) fprintf(stderr, "refused by %s: operators only\n", name);
+        else fprintf(stderr, "no answer from %s: %s\n", name, strerror(e));
         return -1;
     }
     return (int)r;

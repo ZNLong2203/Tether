@@ -24,6 +24,15 @@ out=$(on -u 2002:2002 $C actuate 20 2>&1); echo "   as uid 2002: $out"
 case "$out" in *ermission*|*EACCES*|*denied*) verdict ok "uid 2002 cannot open /dev/tether/actuator";; *) verdict bad "uid 2002 cannot open /dev/tether/actuator";; esac
 sleep 1; refresh; [ "$(f hw_denied_opens)" -gt "$D0" ] && verdict ok "hardware counted the refused open" || verdict bad "hardware counted the refused open"
 
+echo "== the AI's user may do none of the operator's things"
+refused=0; total=0
+for cmd in "guard off" "fault spike" "reset" "model vent-unvalidated" "lung ards"; do
+  out=$(on -u 2002:2002 $C $cmd 2>&1); total=$((total+1))
+  case "$out" in *refused*|*ermission*) refused=$((refused+1));; *) echo "   NOT refused: $cmd -> $out";; esac
+done
+[ "$refused" -eq "$total" ] && verdict ok "uid 2002 refused $total of $total operator actions" || verdict bad "uid 2002 refused only $refused of $total operator actions"
+refresh; [ "$(f mode)" = AI ] && verdict ok "none of them changed anything: the AI is still in control" || verdict bad "state changed by the AI user"
+
 for ft in spike nan stuck drift; do
   echo "== fault: $ft"
   $C fault $ft >/dev/null
@@ -64,9 +73,23 @@ sleep 20; refresh; V4=$(f violations)
 [ "$V4" = "$V3" ] && verdict ok "unvalidated model: no violation in 20 s (mode $(f mode), reason $(f reason))" || verdict bad "unvalidated model: $(( V4 - V3 )) violations"
 $C model vent-v1 >/dev/null; wait_for mode AI 60 && verdict ok "swapped back to vent-v1, AI readmitted" || verdict bad "swapped back to vent-v1"
 
+echo "== the patient changes while the AI is driving"
+for lung in ards asthma healthy; do
+  $C lung $lung >/dev/null; sleep 25
+  if wait_for mode AI 30; then verdict ok "$lung: AI in control, tidal volume $(f vt_last) L, estimated R=$(f est_r) C=$(f est_c)"; else verdict bad "$lung: AI not in control"; fi
+done
+
 echo "== totals"; refresh
 OUTSIDE=$(( (V1 - V0) + ($(f violations) - V5) ))
 [ "$OUTSIDE" -eq 0 ] && verdict ok "no envelope violation outside the deliberate guard-off test (episode: $(( V5 - V1 )) ticks)" || verdict bad "$OUTSIDE envelope violations outside the guard-off test"
+echo "== killing the parts that must not die (statistics restart with the arbiter)"
+for proc in tether-arbiter tether-hw; do
+  slay -f $proc; sleep 1
+  if wait_for mode AI 60 && [ "$(f ai_connected)" = 1 ]; then verdict ok "$proc killed: supervisor restarted everything, AI back in control"; else verdict bad "$proc killed: system did not recover"; fi
+done
+slay -f tether-bridge; sleep 4
+[ "$(pidin -F "%a %N" 2>&1 | grep -c tether-bridge)" -ge 1 ] && verdict ok "tether-bridge killed: restarted on its own" || verdict bad "tether-bridge not restarted"
+
 [ "$FAILS" -eq 0 ] && echo "ALL PASS" || echo "$FAILS FAILED"
 exit $FAILS
 REMOTE

@@ -66,7 +66,7 @@ The SDP is installed in `~/qnx800`, QNX Software Center in `~/qnx-qsc`.
 | `tools/build-qnx.sh` | Cross-compile only (output in `build-qnx/`) |
 | `tools/qemu/deploy.sh` | Copy a fresh build into the running VM without rebuilding the image |
 | `tools/qemu/stack.sh start\|stop\|status\|logs` | Restart the Tether processes in the VM |
-| `tools/qemu/selftest.sh` | The 21 pass/fail checks |
+| `tools/qemu/selftest.sh` | The 29 pass/fail checks |
 | `tools/qemu/fault-tour.sh [fault …]` | Inject faults one by one and print what the arbiter did |
 | `tools/qemu/latency-test.sh 25 none hog bypass slow` | Wake-up latency in separate windows |
 

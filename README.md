@@ -57,7 +57,7 @@ the live system inside the QNX image and prints PASS or FAIL.
 | QNX feature | What Tether uses it for | Code | Seen working |
 |---|---|---|---|
 | Resource manager (`resmgr`, `iofunc`, `devctl`) | The virtual blower and flow sensor as `/dev/tether/{sensor,actuator,plant}` | [`qnx/hw/tether-hw.c`](qnx/hw/tether-hw.c) | `ls -l /dev/tether`: actuator `crw-------`, plant `crw-rw----` (group 2000), sensor `cr--r--r--` |
-| Kernel permission check on `open()` | The AI's user cannot open the actuator; the hardware counts refusals | same | `on -u 2002 tether-ctl actuate 20` → `Permission denied`; 300 refusals in 6 s under the `bypass` fault |
+| Kernel permission check on `open()` | The AI's user cannot open the actuator; the hardware counts refusals | same | `on -u 2002 tether-ctl actuate 20` → `Permission denied`; 298 refusals in 6 s under the `bypass` fault |
 | `procmgr_ability` + `setuid` | The AI and the dashboard start as root, lock away spawn, fork, setuid, physical memory, I/O and more, then become unprivileged | [`qnx/ai/tether-ai.c`](qnx/ai/tether-ai.c), [`qnx/bridge/tether-bridge.c`](qnx/bridge/tether-bridge.c) | log: `now uid 2002 gid 2002, abilities locked` |
 | Message passing (`MsgSend/Receive/Reply`, `name_attach`) | AI → arbiter proposals; dashboard → arbiter and AI | [`qnx/arbiter/tether-arbiter.c`](qnx/arbiter/tether-arbiter.c) | closed loop at 250 Hz |
 | Disconnect pulse (`_PULSE_CODE_DISCONNECT`) | The arbiter learns an AI process died without polling it | `ipc_loop()` in the arbiter | log: `AI disconnected (kernel disconnect pulse)` |
@@ -72,10 +72,12 @@ the live system inside the QNX image and prints PASS or FAIL.
 Measured on QNX SDP 8.0 (`QNX 8.0.0 2026/06/05 QEMU_virt aarch64le`) inside QEMU 11.1.3 on an Apple
 M4 Mac, with the control loop at 250 Hz. Full method and caveats in [`docs/results.md`](docs/results.md).
 
-**Faults.** `selftest.sh`: 21 checks, all pass, covering `spike`, `nan`, `stuck`, `drift`, `bypass`,
-`hog`, `crash`, `hang`, a model swapped in at run time, and the same fault with the guard turned off.
+**Faults.** `selftest.sh`: 29 checks, all pass, covering `spike`, `nan`, `stuck`, `drift`, `bypass`, `hog`,
+`crash`, `hang`, a model swapped in at run time, a patient who changes from healthy to ARDS to asthma,
+the AI's user being refused every operator action, the arbiter and the hardware being killed, and the
+same fault with the guard turned off.
 Outside that last deliberate test there were **zero** violations of the envelope. With the guard off,
-the same `spike` fault produced 1,231 ticks over the limits.
+the same `spike` fault produced 1,249 ticks over the limits.
 
 **Timing.** Wake-up latency of the 4 ms control tick, in separate 25 s windows (µs):
 
