@@ -6,6 +6,7 @@
  *   tether-ctl actuate <cmH2O>      write a blower command (root only)
  *   tether-ctl lung healthy|ards|asthma   change the simulated patient (root only)
  *   tether-ctl status               arbiter status as JSON
+ *   tether-ctl model <name>         hot-swap the AI's model (/data/tether/models/<name>.tmlp)
  *   tether-ctl reset                start a new latency measurement window
  *   tether-ctl guard on|off         demo: pass the AI straight to the blower, or not (root only)
  *   tether-ctl fault <name>         tell the AI process to misbehave (see --help)
@@ -65,7 +66,7 @@ static int send_named(const char *name, const void *msg, size_t n, void *reply, 
 static void usage(void)
 {
     fputs("usage: tether-ctl sensor | hw | actuate <cmH2O> | lung <healthy|ards|asthma> |\n"
-          "                  status | reset | guard on|off | fault <name>\n"
+          "                  status | reset | guard on|off | model <name> | fault <name>\n"
           "faults: ", stderr);
     for (int f = 0; f < TETHER_FAULT_COUNT; f++) fprintf(stderr, "%s ", tether_fault_name((tether_fault)f));
     fputc('\n', stderr);
@@ -130,6 +131,22 @@ int main(int argc, char **argv)
             return 1;
         }
         puts(buf);
+        return 0;
+    }
+
+    if (strcmp(cmd, "model") == 0 && argc == 3) {
+        tether_msg_model m;
+        memset(&m, 0, sizeof(m));
+        m.hdr.type = TETHER_MSG_MODEL;
+        snprintf(m.path, sizeof(m.path), "/data/tether/models/%s.tmlp", argv[2]);
+        tether_model_reply r;
+        int n = send_named(TETHER_AI_NAME, &m, sizeof(m), &r, sizeof(r));
+        if (n != (int)sizeof(r)) return 1;
+        if (r.status) {
+            fprintf(stderr, "model not loaded: %s\n", r.err);
+            return 1;
+        }
+        printf("model %u active\n", r.model_id);
         return 0;
     }
 
