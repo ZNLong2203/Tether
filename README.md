@@ -138,6 +138,6 @@ tools/qemu/selftest.sh                 # the pass/fail checks
 | `qnx/` | The QNX processes: `hw`, `arbiter`, `ai`, `bridge`, `tetherd`, `ctl`, the dashboard, and the image inputs |
 | `tools/` | Container, image, VM, self-test and training tooling |
 | `models/` | Shipped models (`.tmlp`): a good one, a second one, and a deliberately biased one for the hot-swap demo |
-| `docs/` | [architecture](docs/architecture.md), [results](docs/results.md), [running](docs/running.md), [Devpost images](docs/devpost/README.md) |
+| `docs/` | [architecture](docs/architecture.md), [results](docs/results.md), [running](docs/running.md) |
 
 Licensed under Apache-2.0.
