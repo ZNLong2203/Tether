@@ -175,7 +175,11 @@ int main(int argc, char **argv)
             }
             /* A hung AI never exits: kill it so it becomes a crash. */
             static int tick;
-            if (++tick % 3 == 0 && c[AI].pid > 0 && tether_now_ns() - c[AI].started_ns > 3 * TETHER_NS_PER_S) {
+            /* Test switch: while this file exists a silent AI is left alone, so a
+             * measurement can watch the system under a sustained CPU hog. */
+            char sw[200];
+            snprintf(sw, sizeof(sw), "%s/no-hang-kill", g_dir);
+            if (++tick % 3 == 0 && c[AI].pid > 0 && access(sw, F_OK) != 0 && tether_now_ns() - c[AI].started_ns > 3 * TETHER_NS_PER_S) {
                 int64_t silent = ai_silence_ns();
                 if (silent > (int64_t)(hang_kill_s * 1e9)) {
                     qlog(TAG, "AI silent for %.1f s: killing pid %d", (double)silent * 1e-9, (int)c[AI].pid);

@@ -9,13 +9,17 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SECS="${1:-20}"; [ $# -gt 0 ] && shift
 WINDOWS=("$@"); [ ${#WINDOWS[@]} -gt 0 ] || WINDOWS=(none hog bypass slow)
-exec "$ROOT/tools/qemu/run-vm.sh" ssh "SECS=$SECS WINDOWS='${WINDOWS[*]}' sh -s" <<'REMOTE'
+# Run at priority 30 so the measuring tool is not starved by a CPU-hogging AI (priority 20).
+exec "$ROOT/tools/qemu/run-vm.sh" ssh "SECS=$SECS WINDOWS='${WINDOWS[*]}' on -p 30 sh -s" <<'REMOTE'
 cd /data/tether
 C=bin/tether-ctl
 J=
 # first/last match of a key: wake and exec both have a p99_ns, wake comes first
 first() { echo "$J" | tr ',' '\n' | grep -E "\"$1\"" | head -1 | sed 's/.*://; s/[{}"]//g'; }
 last()  { echo "$J" | tr ',' '\n' | grep -E "\"$1\"" | tail -1 | sed 's/.*://; s/[{}"]//g'; }
+# Do not let the supervisor kill an AI that the stress makes silent: we want the
+# stress to last the whole window. (A sustained hog is otherwise ended after ~1 s.)
+touch /data/tether/no-hang-kill
 for w in $WINDOWS; do
   $C fault none >/dev/null; sleep 5; $C reset; [ "$w" != none ] && $C fault "$w" >/dev/null
   sleep $SECS
@@ -26,4 +30,5 @@ for w in $WINDOWS; do
     "$(first ctl_overruns)" "$(first violations)" "$(first mode)"
 done
 $C fault none >/dev/null
+rm -f /data/tether/no-hang-kill
 REMOTE
