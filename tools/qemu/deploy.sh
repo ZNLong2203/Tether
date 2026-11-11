@@ -10,7 +10,7 @@ KH="$ROOT/target/qemu/local/ssh-ident"
 SSH=(-i "$KEY" -o IdentitiesOnly=yes -o "UserKnownHostsFile=$KH")
 
 "$ROOT/tools/qemu/run-vm.sh" ssh 'mkdir -p /data/tether/bin /data/tether/models /data/tether/www'
-scp -q "${SSH[@]}" -P 2222 "$BUILD"/qnx/tether-* root@127.0.0.1:/data/tether/bin/
+scp -q "${SSH[@]}" -P 2222 "$BUILD"/qnx/tether-* "$BUILD"/qnx/tetherd root@127.0.0.1:/data/tether/bin/
 scp -q "${SSH[@]}" -P 2222 "$ROOT"/models/*.tmlp root@127.0.0.1:/data/tether/models/
 [ -d "$ROOT/qnx/www" ] && scp -q "${SSH[@]}" -P 2222 "$ROOT"/qnx/www/* root@127.0.0.1:/data/tether/www/ || true
 "$ROOT/tools/qemu/run-vm.sh" ssh 'chmod +x /data/tether/bin/*; ls -l /data/tether/bin'

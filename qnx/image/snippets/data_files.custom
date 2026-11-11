@@ -1,0 +1,14 @@
+# Tether programs, models and dashboard on the data partition (/data/tether).
+# Paths are as seen inside the build container: the repository is /work.
+# Run tools/build-qnx.sh first so the programs exist.
+[uid=0 gid=0 dperms=755 perms=755] tether/bin/tetherd=/work/build-qnx/qnx/tetherd
+[uid=0 gid=0 perms=755] tether/bin/tether-hw=/work/build-qnx/qnx/tether-hw
+[uid=0 gid=0 perms=755] tether/bin/tether-arbiter=/work/build-qnx/qnx/tether-arbiter
+[uid=0 gid=0 perms=755] tether/bin/tether-ai=/work/build-qnx/qnx/tether-ai
+[uid=0 gid=0 perms=755] tether/bin/tether-bridge=/work/build-qnx/qnx/tether-bridge
+[uid=0 gid=0 perms=755] tether/bin/tether-ctl=/work/build-qnx/qnx/tether-ctl
+[uid=0 gid=0 dperms=755 perms=644] tether/models/vent-v1.tmlp=/work/models/vent-v1.tmlp
+[uid=0 gid=0 perms=644] tether/models/vent-v2.tmlp=/work/models/vent-v2.tmlp
+[uid=0 gid=0 perms=644] tether/models/vent-unvalidated.tmlp=/work/models/vent-unvalidated.tmlp
+[uid=0 gid=0 dperms=755 perms=644] tether/www/index.html=/work/qnx/www/index.html
+[uid=0 gid=0 perms=644] tether/flags=/work/qnx/image/tether.flags

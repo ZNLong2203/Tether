@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tether — runtime assurance on QNX</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #171e26; --line: #2a3441; --text: #e6edf3; --muted: #8b98a8;
+    --ai: #3fb68b; --safe: #f0a93b; --bad: #ef5a5a; --blue: #58a6ff; --limit: #ef5a5a99;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+           padding: 12px 20px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+  h1 small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+  .sim { border: 1px solid var(--safe); color: var(--safe); padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; padding: 16px 20px; max-width: 1400px; margin: 0 auto; }
+  @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  #banner { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; justify-content: space-between;
+            border-left: 6px solid var(--ai); }
+  #banner.safe { border-left-color: var(--safe); } #banner.off { border-left-color: var(--bad); } #banner.down { border-left-color: var(--muted); }
+  #mode { font-size: 22px; font-weight: 700; } #why { color: var(--muted); }
+  canvas { width: 100%; height: 230px; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .card { background: #11171e; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .card b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .card span { color: var(--muted); font-size: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  button, select { background: #202a35; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
+                   font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--blue); } button.on { border-color: var(--bad); color: var(--bad); }
+  button.danger:hover { border-color: var(--bad); }
+  .lab { color: var(--muted); font-size: 12px; margin: 10px 0 4px; }
+  #log { max-height: 190px; overflow: auto; font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); }
+  #log div b { color: var(--text); font-weight: 600; } .ev-safe { color: var(--safe); } .ev-ai { color: var(--ai); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  td { padding: 3px 0; } td:last-child { text-align: right; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 10px 20px 24px; max-width: 1000px; margin: 0 auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tether <small>runtime assurance for an AI ventilator controller · QNX 8.0</small></h1>
+  <span class="sim">SIMULATED PATIENT · research demo, not a medical device</span>
+</header>
+
+<main>
+  <section id="banner" class="panel">
+    <div><div id="mode">connecting…</div><div id="why"></div></div>
+    <div id="who" style="color:var(--muted)"></div>
+  </section>
+
+  <section>
+    <div class="panel" style="margin-bottom:16px">
+      <h2>Airway pressure · cmH₂O</h2>
+      <canvas id="cp" width="1000" height="230"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--blue)"></i>measured pressure</span>
+        <span><i style="background:var(--ai)"></i>AI proposal</span>
+        <span><i style="background:var(--limit)"></i>pressure limit</span>
+        <span><i style="background:#f0a93b55;height:10px"></i>recovery controller in control</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Delivered volume above PEEP · litres</h2>
+      <canvas id="cv" width="1000" height="230"></canvas>
+      <div class="legend">
+        <span><i style="background:var(--blue)"></i>volume</span>
+        <span><i style="background:var(--ai)"></i>target</span>
+        <span><i style="background:var(--limit)"></i>volume limit</span>
+      </div>
+    </div>
+  </section>
+
+  <aside style="display:grid;gap:16px;align-content:start">
+    <div class="panel">
+      <h2>Patient and safety</h2>
+      <div class="cards">
+        <div class="card"><b id="vt">–</b><span>last tidal volume (target <span id="vtt">–</span> L)</span></div>
+        <div class="card"><b id="viol">–</b><span>envelope violations</span></div>
+        <div class="card"><b id="sw">–</b><span>switches to SAFE</span></div>
+        <div class="card"><b id="est">–</b><span>estimated R / C</span></div>
+        <div class="card"><b id="den">–</b><span>opens refused by the OS</span></div>
+        <div class="card"><b id="wd">–</b><span>hardware watchdog trips</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Make the AI misbehave</h2>
+      <div class="row" id="faults"></div>
+      <div class="lab">Patient (simulated lung)</div>
+      <div class="row" id="lungs"></div>
+      <div class="lab">AI model (hot swap, envelope unchanged)</div>
+      <div class="row"><select id="model"></select><button id="swap">Swap model</button></div>
+      <div class="lab">Without Tether (demo)</div>
+      <div class="row"><button id="guard" class="danger">Tether guard: ON</button></div>
+      <div class="note" id="msg"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Control loop timing</h2>
+      <table>
+        <tr><td>wake-up latency p50</td><td id="w50">–</td></tr>
+        <tr><td>p99</td><td id="w99">–</td></tr>
+        <tr><td>p99.9</td><td id="w999">–</td></tr>
+        <tr><td>max</td><td id="wmax">–</td></tr>
+        <tr><td>control period</td><td id="per">–</td></tr>
+        <tr><td>ticks skipped</td><td id="ovr">–</td></tr>
+        <tr><td>AI restarts</td><td id="rst">–</td></tr>
+      </table>
+      <div class="row" style="margin-top:8px"><button id="reset">Start new window</button></div>
+      <div class="note">Measured inside QEMU with software emulation, so jitter reflects the emulator, not real hardware.</div>
+    </div>
+
+    <div class="panel"><h2>Events</h2><div id="log"></div></div>
+  </aside>
+</main>
+<footer>The lung is simulated. Tether is a research prototype: it is not certified, not a medical device, and makes no clinical claim.</footer>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const HDR = { "X-Tether": "1" };
+const FAULTS = ["none","crash","hang","hog","slow","nan","spike","drift","stuck","bypass"];
+const LUNGS = [["healthy","Healthy"],["ards","ARDS (stiff)"],["asthma","Asthma (resistive)"]];
+let hz = 250, cursor = 0, buf = [], status = null, lastFault = "none";
+const WINDOW_S = 12;
+
+function post(path) {
+  return fetch(path, { method: "POST", headers: HDR }).then(r => r.json())
+    .then(j => { $("msg").textContent = j.ok === false ? (j.error || "failed") : ""; return j; })
+    .catch(() => { $("msg").textContent = "request failed"; });
+}
+
+for (const f of FAULTS) {
+  const b = document.createElement("button"); b.textContent = f === "none" ? "clear fault" : f; b.dataset.f = f;
+  b.onclick = () => post("/api/fault?name=" + f).then(() => { lastFault = f; });
+  $("faults").appendChild(b);
+}
+for (const [k, label] of LUNGS) {
+  const b = document.createElement("button"); b.textContent = label;
+  b.onclick = () => post("/api/lung?preset=" + k);
+  $("lungs").appendChild(b);
+}
+$("swap").onclick = () => post("/api/model?name=" + $("model").value);
+$("reset").onclick = () => post("/api/reset");
+$("guard").onclick = () => post("/api/guard?on=" + (status && status.arbiter.guard_off ? 1 : 0));
+
+function fmtUs(ns) { return ns < 1e6 ? (ns / 1e3).toFixed(0) + " µs" : (ns / 1e6).toFixed(2) + " ms"; }
+
+function drawChart(cv, series, opts) {
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height, L = 44, R = 10, T = 8, B = 20;
+  ctx.clearRect(0, 0, W, H);
+  const n = buf.length; if (n < 2) return;
+  const t1 = buf[n - 1][0], x = tick => L + (W - L - R) * (1 - (t1 - tick) / hz / WINDOW_S);
+  const y = v => T + (H - T - B) * (1 - (v - opts.min) / (opts.max - opts.min));
+  ctx.font = "11px system-ui"; ctx.fillStyle = "#8b98a8"; ctx.strokeStyle = "#2a3441"; ctx.lineWidth = 1;
+  for (let v = opts.min; v <= opts.max + 1e-9; v += opts.step) {
+    ctx.beginPath(); ctx.moveTo(L, y(v)); ctx.lineTo(W - R, y(v)); ctx.stroke();
+    ctx.fillText(v.toFixed(opts.dec), 4, y(v) + 4);
+  }
+  for (let s = 0; s <= WINDOW_S; s += 2) ctx.fillText("-" + (WINDOW_S - s) + "s", x(t1 - (WINDOW_S - s) * hz) - 8, H - 5);
+  // recovery controller in control: shaded
+  ctx.fillStyle = "#f0a93b2e"; let start = null;
+  for (let i = 0; i < n; i++) {
+    const safe = buf[i][6] === 0;
+    if (safe && start === null) start = buf[i][0];
+    if ((!safe || i === n - 1) && start !== null) { ctx.fillRect(x(start), T, Math.max(1, x(buf[i][0]) - x(start)), H - T - B); start = null; }
+  }
+  for (const l of opts.lines) {
+    ctx.strokeStyle = l.color; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(L, y(l.v)); ctx.lineTo(W - R, y(l.v)); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  for (const s of series) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.w || 2; ctx.beginPath(); let pen = false;
+    for (let i = 0; i < n; i++) {
+      const v = buf[i][s.idx]; if (v === null || !isFinite(v)) { pen = false; continue; }
+      const px = x(buf[i][0]), py = y(Math.max(opts.min, Math.min(opts.max, v)));
+      pen ? ctx.lineTo(px, py) : ctx.moveTo(px, py); pen = true;
+    }
+    ctx.stroke();
+  }
+}
+
+function render() {
+  if (!status || !status.arbiter) return;
+  const a = status.arbiter;
+  drawChart($("cp"), [{ idx: 5, color: "#3fb68b", w: 1.5 }, { idx: 1, color: "#58a6ff" }],
+            { min: 0, max: 60, step: 10, dec: 0, lines: [{ v: a.p_max, color: "#ef5a5a99" }] });
+  drawChart($("cv"), [{ idx: 3, color: "#58a6ff" }],
+            { min: 0, max: 0.8, step: 0.2, dec: 1, lines: [{ v: a.vt_max, color: "#ef5a5a99" }, { v: a.vt_target, color: "#3fb68b99" }] });
+}
+
+function showStatus(s) {
+  status = s; const a = s.arbiter; hz = s.control_hz || hz;
+  const banner = $("banner");
+  banner.className = "panel";
+  if (a.guard_off) { banner.classList.add("off"); $("mode").textContent = "TETHER GUARD OFF"; $("why").textContent = "the AI drives the blower directly (demo)"; }
+  else if (a.mode === "AI") { $("mode").textContent = "AI IN CONTROL"; $("why").textContent = "every proposal is checked against the envelope"; }
+  else { banner.classList.add("safe"); $("mode").textContent = "SAFE: recovery controller in control"; $("why").textContent = "AI rejected: " + a.reason; }
+  const ai = s.ai;
+  $("who").textContent = ai ? `AI pid ${ai.pid} · uid ${ai.uid} · model ${ai.model_id} · fault: ${ai.fault}` : (a.ai_connected ? "AI connected" : "AI process not connected");
+  $("vt").textContent = a.vt_last.toFixed(3); $("vtt").textContent = a.vt_target.toFixed(2);
+  $("viol").textContent = a.violations; $("sw").textContent = a.switches_to_safe;
+  $("est").textContent = a.est_valid ? `${a.est_r.toFixed(1)} / ${a.est_c.toFixed(3)}` : "–";
+  $("den").textContent = s.hw ? s.hw.denied_opens : "–"; $("wd").textContent = s.hw ? s.hw.watchdog_trips : "–";
+  $("w50").textContent = fmtUs(a.wake.p50_ns); $("w99").textContent = fmtUs(a.wake.p99_ns);
+  $("w999").textContent = fmtUs(a.wake.p999_ns); $("wmax").textContent = fmtUs(a.wake.max_ns);
+  $("per").textContent = (1000 / hz).toFixed(1) + " ms (" + hz + " Hz)"; $("ovr").textContent = a.ctl_overruns;
+  $("rst").textContent = a.ai_restarts;
+  $("guard").textContent = "Tether guard: " + (a.guard_off ? "OFF (click to turn on)" : "ON"); $("guard").classList.toggle("on", !!a.guard_off);
+  for (const b of $("faults").children) b.classList.toggle("on", ai && ai.fault === b.dataset.f && b.dataset.f !== "none");
+  const sel = $("model"); const cur = sel.value;
+  if (sel.options.length !== s.models.length) { sel.innerHTML = ""; for (const m of s.models) sel.add(new Option(m, m)); if (cur) sel.value = cur; }
+  const rows = a.events.slice(0, 8).map(e => {
+    const t = (e.t_ns / 1e9).toFixed(1);
+    return `<div><b>${t}s</b> <span class="${e.to === "AI" ? "ev-ai" : "ev-safe"}">→ ${e.to}</span> (${e.reason}) breath ${e.breath}</div>`;
+  });
+  $("log").innerHTML = rows.join("") || "<div>no switches yet</div>";
+}
+
+async function pollStatus() {
+  try { showStatus(await (await fetch("/api/status")).json()); } catch (e) { $("mode").textContent = "no connection to the gateway"; }
+  setTimeout(pollStatus, 1000);
+}
+async function pollTelemetry() {
+  try {
+    const j = await (await fetch("/api/telemetry?cursor=" + cursor)).json();
+    if (j.samples) {
+      cursor = j.next; for (const s of j.samples) buf.push(s);
+      const keep = Math.ceil(WINDOW_S * hz) + 10; if (buf.length > keep) buf = buf.slice(buf.length - keep);
+      render();
+    }
+  } catch (e) { /* the status poll reports connection trouble */ }
+  setTimeout(pollTelemetry, 250);
+}
+pollStatus(); pollTelemetry();
+</script>
+</body>
+</html>

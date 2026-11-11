@@ -6,7 +6,7 @@
  *
  *   /dev/tether/sensor    0444  read paw/flow (devctl READ_SENSOR), status
  *   /dev/tether/actuator  0600  root only: set the blower pressure command
- *   /dev/tether/plant     0600  root only: change the simulated lung
+ *   /dev/tether/plant     0660  root and group 2000 (operators): change the simulated lung
  *
  * Because the actuator node is root-only, a process running as the AI's user
  * cannot open it: the kernel refuses, not our code. Refusals are counted.
@@ -236,12 +236,12 @@ int main(int argc, char **argv)
     static const struct { const char *path; mode_t mode; } nodes[NODE_COUNT] = {
         [NODE_SENSOR] = { TETHER_DEV_SENSOR, S_IFCHR | 0444 },
         [NODE_ACTUATOR] = { TETHER_DEV_ACTUATOR, S_IFCHR | 0600 },
-        [NODE_PLANT] = { TETHER_DEV_PLANT, S_IFCHR | 0600 },
+        [NODE_PLANT] = { TETHER_DEV_PLANT, S_IFCHR | 0660 }, /* group: operators (the dashboard) */
     };
     for (int i = 0; i < NODE_COUNT; i++) {
         iofunc_attr_init(&hw.attr[i], nodes[i].mode, NULL, NULL);
         hw.attr[i].uid = 0;
-        hw.attr[i].gid = 0;
+        hw.attr[i].gid = (i == NODE_PLANT) ? TETHER_GID_OPS : 0;
         if (resmgr_attach(dpp, &rattr, nodes[i].path, _FTYPE_ANY, 0, &cfuncs, &ifuncs, &hw.attr[i]) == -1) {
             qlog(TAG, "resmgr_attach %s failed: errno %d", nodes[i].path, errno);
             return 1;

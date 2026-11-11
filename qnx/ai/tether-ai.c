@@ -134,6 +134,15 @@ static void *control_thread(void *arg)
             MsgReply(rcvid, EOK, NULL, 0);
             continue;
         }
+        if (msg.hdr.type != TETHER_MSG_AI_INFO) {
+            /* Only operators may make the AI misbehave or change its model. */
+            struct _client_info ci;
+            if (ConnectClientInfo(info.scoid, &ci, 0) == -1 ||
+                (ci.cred.euid != 0 && ci.cred.euid != TETHER_UID_BRIDGE)) {
+                MsgError(rcvid, EPERM);
+                continue;
+            }
+        }
         switch (msg.hdr.type) {
         case TETHER_MSG_FAULT: {
             tether_fault_reply r;

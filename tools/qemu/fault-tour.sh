@@ -1,7 +1,8 @@
 #!/bin/bash
 # Inject every fault into the running Tether stack in the VM, one after another,
-# and print what the arbiter did. Needs hw, arbiter and ai already running
-# (tools/qemu/stack.sh start) and the VM up (tools/qemu/run-vm.sh start).
+# and print what the arbiter did. Needs the stack running (it starts with the
+# image; or tools/qemu/stack.sh start) and the VM up (tools/qemu/run-vm.sh start).
+# crash and hang are recovered by the supervisor, tetherd, not by this script.
 #   tools/qemu/fault-tour.sh [fault ...]     default: all
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -27,9 +28,7 @@ for f in $FAULTS; do
   show
   case $f in
     crash|hang)
-      [ $f = hang ] && slay -f tether-ai
-      echo "   restarting the AI process (the supervisor does this later)"
-      bin/tether-ai $(cat /data/tether/flags) > ai.log 2>&1 &
+      echo "   waiting for tetherd to bring the AI back"
       sleep 8; show ;;
     *) $C fault none; sleep 6; echo "   after the fault clears:"; show ;;
   esac

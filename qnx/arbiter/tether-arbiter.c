@@ -293,6 +293,12 @@ static int client_uid(int scoid)
     return (int)ci.cred.euid;
 }
 
+/* Operators: root, and the dashboard's user. The AI is never one. */
+static int is_ops(int uid)
+{
+    return uid == 0 || uid == TETHER_UID_BRIDGE;
+}
+
 static void handle_propose(int rcvid, const ipc_msg *m, const struct _msg_info *info)
 {
     if (info->msglen < (int)sizeof(tether_msg_propose)) {
@@ -400,7 +406,7 @@ static void ipc_loop(void)
             handle_telemetry(rcvid, &msg, &info);
             break;
         case TETHER_MSG_RESET_STATS: {
-            if (client_uid(info.scoid) != 0) {
+            if (!is_ops(client_uid(info.scoid))) {
                 MsgError(rcvid, EPERM);
                 break;
             }
@@ -410,7 +416,7 @@ static void ipc_loop(void)
             break;
         }
         case TETHER_MSG_GUARD: {
-            if (info.msglen < (int)sizeof(tether_msg_guard) || client_uid(info.scoid) != 0) {
+            if (info.msglen < (int)sizeof(tether_msg_guard) || !is_ops(client_uid(info.scoid))) {
                 MsgError(rcvid, EPERM);
                 break;
             }

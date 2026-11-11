@@ -4,8 +4,9 @@
 #   tools/qemu/build-image.sh --clean    also throw away cached intermediate files
 #
 # mkqnximage runs inside the build container (tools/docker/run.sh). Our own
-# inputs are in qnx/image/snippets/ and are copied into mkqnximage's local/
-# folder first. target/ is generated and git-ignored: it contains private keys.
+# inputs are in qnx/image/ (snippets, default flags) and are copied into
+# mkqnximage's local/ folder first. The programs are cross-compiled first and
+# baked into the data partition; tetherd starts at boot. target/ is generated and git-ignored: it contains private keys.
 #
 # Needs, from the QNX Software Center (tools/docker/install-sdp.sh --packages):
 #   com.qnx.qnx800.target.qemuvirt and the virtio driver packages.
@@ -14,6 +15,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 [ -f "$HOME/.qnx/tether_vm_ed25519.pub" ] || { echo "missing ~/.qnx/tether_vm_ed25519.pub (see header of this script)"; exit 1; }
+
+"$ROOT/tools/build-qnx.sh" # the image embeds the programs
 
 exec "$ROOT/tools/docker/run.sh" bash -lc '
   set -euo pipefail

@@ -1,0 +1,1 @@
+--control-hz=250 --ai-hz=50 --plant-hz=500 --readmit-ticks=50 --max-age-ms=100 --hw-watchdog-ms=200

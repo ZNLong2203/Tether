@@ -1,0 +1,4 @@
+# Commands run at the end of system start-up (mkqnximage post_startup.sh).
+# The supervisor starts hw, arbiter, AI and dashboard in order and restarts the
+# AI if it dies. It reads its options from /data/tether/flags.
+/data/tether/bin/tetherd > /data/tether/tetherd.log 2>&1 &
