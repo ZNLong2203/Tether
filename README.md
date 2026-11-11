@@ -139,5 +139,6 @@ tools/qemu/selftest.sh                 # the pass/fail checks
 | `tools/` | Container, image, VM, self-test and training tooling |
 | `models/` | Shipped models (`.tmlp`): a good one, a second one, and a deliberately biased one for the hot-swap demo |
 | `docs/` | [architecture](docs/architecture.md), [results](docs/results.md), [running](docs/running.md) |
+| `docs/codelab/` | A hands-on tutorial built from Tether's pieces: [keep an untrusted process away from a device on QNX 8.0](docs/codelab/markdown/qnx-kernel-gate/qnx-kernel-gate.md) (submitted to QNX as [qnx/codelabs#73](https://github.com/qnx/codelabs/pull/73)) |
 
 Licensed under Apache-2.0.

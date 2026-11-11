@@ -1,9 +1,12 @@
 # ─────────────────────────────────────────────────────────────
-#  Private — never pushed. The repo goes public; these do not.
-#  (strategy notes, submission drafts, demo script, video sources)
+#  Local-only working files: not part of the published repository.
 # ─────────────────────────────────────────────────────────────
 /private/
 *.private.md
+
+# Notes for local coding agents
+/AGENTS.md
+/CLAUDE.md
 
 # ─── Secrets / QNX licences ──────────────────────────────────
 .env
