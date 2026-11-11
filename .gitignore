@@ -45,3 +45,6 @@ node_modules/
 !.vscode/extensions.json
 .idea/
 *.log
+
+# codelab example build output
+/docs/codelab/markdown/*/src/out/
