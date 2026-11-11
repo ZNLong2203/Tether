@@ -98,6 +98,7 @@ in the AI, keeps the loop running.
 
 `build/host/tether-sim --model models/vent-v1.tmlp --campaign`: the worst case over 8 fault-onset
 times inside one breath, healthy lung. Pressure in cmH₂O, volume in litres, limits 35 and 0.56.
+"Time over limits" adds the seconds over the pressure limit to the seconds over the volume limit.
 
 | fault | AI alone: peak pressure | AI alone: peak volume | time over limits | with Tether: peak pressure | peak volume | time over limits |
 |---|---|---|---|---|---|---|

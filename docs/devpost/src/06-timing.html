@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+  .row { display: flex; gap: 26px; margin-top: 22px; }
+  .chart { flex: 1.5; padding: 22px 12px 8px 22px; }
+  .side { flex: .72; display: flex; flex-direction: column; gap: 20px; }
+  .stat { padding: 24px 28px; }
+  .stat .v { font-size: 96px; font-weight: 800; line-height: 1; }
+  .stat .l { font-size: 28px; color: var(--muted); margin-top: 8px; line-height: 1.3; }
+  .legend { position: absolute; right: 96px; top: 96px; font-size: 30px; display: flex; gap: 38px; }
+</style></head><body>
+<div class="slide">
+  <div class="kicker">Real-time · the control loop under stress</div>
+  <h1 style="font-size:62px">The AI can saturate every CPU.<br>The control loop does not notice.</h1>
+  <div class="row">
+    <div class="panel chart"><svg id="c" width="1010" height="650" viewBox="0 0 1010 650"></svg></div>
+    <div class="side">
+      <div class="panel stat"><div class="v" style="color:var(--orange)">99%</div><div class="l">of the CPU busy while the AI ran its <span class="mono">hog</span> fault (4% before)</div></div>
+      <div class="panel stat"><div class="v" style="color:var(--blue)">60 vs 20</div><div class="l">SCHED_FIFO priority of the control loop vs the AI</div></div>
+      <div class="panel stat" style="font-size:27px;line-height:1.35;color:var(--muted)">250 Hz tick, 4 ms period. QEMU software emulation on an Apple M4: jitter reflects the emulator, not real hardware. Maxima are host noise and are in docs/results.md.</div>
+    </div>
+  </div>
+  <div class="legend"><span><span class="dot" style="background:var(--blue)"></span>p50</span><span><span class="dot" style="background:var(--orange)"></span>p99</span></div>
+  <div class="foot"><span>Wake-up latency of the control tick, 25 s windows · tools/qemu/latency-test.sh</span><span>The patient is simulated · research prototype</span></div>
+</div>
+<script src="common.js"></script>
+<script>
+const c = document.getElementById('c');
+const data = [['idle', 1250, 2010], ['AI saturating\nboth CPUs', 1140, 1910], ['AI spamming\nrefused opens', 1230, 2000], ['AI 40 ms\nper inference', 1280, 2060]];
+const L = 96, B = 560, H = 500, MAX = 2500, y = v => B - H * v / MAX, gw = 220, bw = 70, G = 8;
+for (let t = 0; t <= MAX; t += 500) {
+  svg(c, 'line', { x1: L, y1: y(t), x2: 1000, y2: y(t), stroke: '#2a3441', 'stroke-width': 1.5 });
+  svg(c, 'text', { x: L - 14, y: y(t) + 9, fill: '#8b98a8', 'font-size': 26, 'text-anchor': 'end' }, t);
+}
+svg(c, 'text', { x: 8, y: 26, fill: '#8b98a8', 'font-size': 26 }, 'microseconds');
+data.forEach(([name, a, b], i) => {
+  const gx = L + 30 + i * (gw + 24);
+  for (const [k, v, col] of [[0, a, '#3987e5'], [1, b, '#d95926']]) {
+    const bx = gx + k * (bw + G), top = y(v);
+    svg(c, 'path', { d: `M${bx} ${B} V${top + 4} a4 4 0 0 1 4 -4 H${bx + bw - 4} a4 4 0 0 1 4 4 V${B} Z`, fill: col });
+    svg(c, 'text', { x: bx + bw / 2, y: top - 12, fill: '#e6edf3', 'font-size': 29, 'font-weight': 700, 'text-anchor': 'middle' }, v);
+  }
+  name.split('\n').forEach((t, j) => svg(c, 'text', { x: gx + (2 * bw + G) / 2, y: B + 40 + j * 32, fill: '#e6edf3', 'font-size': 27, 'text-anchor': 'middle' }, t));
+});
+</script>
+</body></html>

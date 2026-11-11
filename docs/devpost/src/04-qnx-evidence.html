@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 30px; }
+  .t { padding: 24px 26px 22px; height: 282px; display: flex; flex-direction: column; }
+  .t h3 { font-size: 31px; font-weight: 700; }
+  .t p { font-size: 26px; color: var(--muted); margin-top: 6px; line-height: 1.3; }
+  .t code { margin-top: auto; font: 24px/1.3 ui-monospace, Menlo, monospace; color: var(--ai); background: #11161d; border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; }
+</style></head><body>
+<div class="slide">
+  <div class="kicker">QNX 8.0 · what it is used for, and what we saw</div>
+  <h1 style="font-size:62px">Nine QNX features, each with a result we observed</h1>
+  <div class="grid" id="g"></div>
+  <div class="foot"><span>tools/qemu/selftest.sh runs these on the live system: 29 checks, all pass</span><span>QNX SDP 8.0 · QEMU on Apple M4</span></div>
+</div>
+<script>
+const T = [
+ ['Resource manager', 'The virtual blower and flow sensor as /dev/tether/ device nodes.', 'crw------- root actuator'],
+ ['Kernel permissions', 'The AI’s user cannot open the actuator. The hardware counts every refusal.', 'Permission denied · 298 in 6 s'],
+ ['procmgr_ability + setuid', 'The AI starts as root, locks away spawn, fork and setuid, then becomes uid 2002.', 'now uid 2002 gid 2002, abilities locked'],
+ ['Message passing', 'The AI is always the client: MsgSend a proposal, get the observation back.', '50 proposals/s · 150 µs inference p99'],
+ ['Disconnect pulse', 'The kernel tells the arbiter an AI process died. No polling.', 'AI disconnected (kernel disconnect pulse)'],
+ ['SCHED_FIFO + timer pulses', 'Control loop at priority 60, AI at 20. A CPU-hogging AI cannot starve it.', 'CPU 99% busy · p99 1.91 ms vs 2.01 ms idle'],
+ ['TimerTimeout', 'Every call from tools and the dashboard to another process has a deadline.', 'no answer from tether-ai: Connection timed out'],
+ ['Supervisor', 'posix_spawn, waitpid, SIGKILL: restart a crash, kill a hang.', 'AI silent for 1.2 s: killing pid …'],
+ ['slog2 + mkqnximage', 'One image that boots straight into Tether, with structured logs.', 'dashboard answers ~12 s after boot'],
+];
+const g = document.getElementById('g');
+for (const [h, p, c] of T) {
+  const d = document.createElement('div'); d.className = 'panel t';
+  d.innerHTML = `<h3>${h}</h3><p>${p}</p><code>${c}</code>`; g.appendChild(d);
+}
+</script>
+</body></html>
