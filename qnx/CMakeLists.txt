@@ -14,3 +14,5 @@ endfunction()
 
 tether_process(tether-hw hw/tether-hw.c)
 tether_process(tether-ctl ctl/tether-ctl.c)
+tether_process(tether-arbiter arbiter/tether-arbiter.c)
+tether_process(tether-ai ai/tether-ai.c)

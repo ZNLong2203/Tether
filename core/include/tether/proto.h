@@ -8,6 +8,7 @@
  *   ai-ctrl  --MsgSend(PROPOSE)-->  arbiter     reply: tether_observation
  *   bridge   --MsgSend(STATUS)--->  arbiter     reply: tether_status
  *   bridge   --MsgSend(TELEMETRY)-> arbiter     reply: tether_telemetry_reply + samples
+ *   bridge   --MsgSend(GUARD)---->  arbiter     reply: int32 (the new setting)
  *   bridge   --MsgSend(FAULT)---->  ai-ctrl     reply: tether_fault_reply
  *   bridge   --MsgSend(MODEL)---->  ai-ctrl     reply: tether_model_reply
  *   arbiter  --devctl------------>  /dev/tether/actuator, /dev/tether/sensor
@@ -51,7 +52,8 @@ enum {
     TETHER_MSG_RESET_STATS,
     TETHER_MSG_FAULT,
     TETHER_MSG_MODEL,
-    TETHER_MSG_AI_INFO
+    TETHER_MSG_AI_INFO,
+    TETHER_MSG_GUARD
 };
 
 typedef struct {
@@ -94,6 +96,14 @@ typedef struct {
     int32_t fault;
     int32_t status;  /* 0 or errno */
 } tether_fault_reply;
+
+/* bridge -> arbiter: 1 = runtime assurance on (normal), 0 = pass the AI straight
+ * to the actuator. Demo only: it shows what the same AI does without Tether. */
+typedef struct {
+    tether_msg_hdr hdr;
+    int32_t enable;
+    int32_t pad;
+} tether_msg_guard;
 
 typedef struct {
     tether_msg_hdr hdr;

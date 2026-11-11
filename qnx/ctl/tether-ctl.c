@@ -6,6 +6,8 @@
  *   tether-ctl actuate <cmH2O>      write a blower command (root only)
  *   tether-ctl lung healthy|ards|asthma   change the simulated patient (root only)
  *   tether-ctl status               arbiter status as JSON
+ *   tether-ctl reset                start a new latency measurement window
+ *   tether-ctl guard on|off         demo: pass the AI straight to the blower, or not (root only)
  *   tether-ctl fault <name>         tell the AI process to misbehave (see --help)
  *
  * It also serves as the "attacker" in the demo: run as the AI's user it shows
@@ -63,7 +65,7 @@ static int send_named(const char *name, const void *msg, size_t n, void *reply, 
 static void usage(void)
 {
     fputs("usage: tether-ctl sensor | hw | actuate <cmH2O> | lung <healthy|ards|asthma> |\n"
-          "                  status | fault <name>\n"
+          "                  status | reset | guard on|off | fault <name>\n"
           "faults: ", stderr);
     for (int f = 0; f < TETHER_FAULT_COUNT; f++) fprintf(stderr, "%s ", tether_fault_name((tether_fault)f));
     fputc('\n', stderr);
@@ -117,10 +119,31 @@ int main(int argc, char **argv)
     if (strcmp(cmd, "status") == 0) {
         tether_msg_hdr h = { TETHER_MSG_STATUS, 0, 0 };
         tether_status st;
-        if (send_named(TETHER_ARBITER_NAME, &h, sizeof(h), &st, sizeof(st)) != (int)sizeof(st)) return 1;
-        char buf[4096];
-        if (tether_status_json(&st, buf, sizeof(buf)) < 0) return 1;
+        int r = send_named(TETHER_ARBITER_NAME, &h, sizeof(h), &st, sizeof(st));
+        if (r != (int)sizeof(st)) {
+            if (r >= 0) fprintf(stderr, "status: reply was %d bytes, expected %zu\n", r, sizeof(st));
+            return 1;
+        }
+        static char buf[16384];
+        if (tether_status_json(&st, buf, sizeof(buf)) < 0) {
+            fprintf(stderr, "status: JSON did not fit in %zu bytes\n", sizeof(buf));
+            return 1;
+        }
         puts(buf);
+        return 0;
+    }
+
+    if (strcmp(cmd, "reset") == 0) {
+        tether_msg_hdr h = { TETHER_MSG_RESET_STATS, 0, 0 };
+        int32_t ok = 0;
+        return send_named(TETHER_ARBITER_NAME, &h, sizeof(h), &ok, sizeof(ok)) == (int)sizeof(ok) ? 0 : 1;
+    }
+
+    if (strcmp(cmd, "guard") == 0 && argc == 3) {
+        tether_msg_guard m = { { TETHER_MSG_GUARD, 0, 0 }, strcmp(argv[2], "on") == 0, 0 };
+        int32_t now_on = 0;
+        if (send_named(TETHER_ARBITER_NAME, &m, sizeof(m), &now_on, sizeof(now_on)) != (int)sizeof(now_on)) return 1;
+        printf("guard %s\n", now_on ? "ON" : "OFF");
         return 0;
     }
 
@@ -132,7 +155,11 @@ int main(int argc, char **argv)
         }
         tether_msg_fault m = { { TETHER_MSG_FAULT, 0, 0 }, (int32_t)f, 0 };
         tether_fault_reply r;
-        if (send_named(TETHER_AI_NAME, &m, sizeof(m), &r, sizeof(r)) != (int)sizeof(r)) return 1;
+        int n = send_named(TETHER_AI_NAME, &m, sizeof(m), &r, sizeof(r));
+        if (n != (int)sizeof(r)) {
+            if (n >= 0) fprintf(stderr, "fault: reply was %d bytes, expected %zu\n", n, sizeof(r));
+            return 1;
+        }
         printf("fault %s: %s\n", tether_fault_name((tether_fault)r.fault), r.status ? strerror(r.status) : "armed");
         return r.status ? 1 : 0;
     }

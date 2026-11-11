@@ -91,7 +91,7 @@ static void *physics_thread(void *arg)
             (double)(now - hw.last_cmd_ns) * 1e-9 > hw.cfg.timing.hw_watchdog_s) {
             hw.wd_active = 1;
             hw.wd_trips++;
-            qlog(TAG, "watchdog: no command for %.0f ms, blower falls back to PEEP",
+            qlog_rt(TAG, "watchdog: no command for %.0f ms, blower falls back to PEEP",
                  (double)(now - hw.last_cmd_ns) * 1e-6);
         }
         hw.u_applied = hw.wd_active ? hw.cfg.vent.peep : hw.u_cmd;
@@ -143,7 +143,7 @@ static int hw_devctl(resmgr_context_t *ctp, io_devctl_t *msg, iofunc_ocb_t *ocb)
         hw.have_cmd = 1;
         if (hw.wd_active) {
             hw.wd_active = 0;
-            qlog(TAG, "watchdog cleared: commands are arriving again");
+            qlog_rt(TAG, "watchdog cleared: commands are arriving again");
         }
         hw.commands++;
         pthread_mutex_unlock(&hw.mu);
@@ -182,11 +182,16 @@ static int hw_open(resmgr_context_t *ctp, io_open_t *msg, RESMGR_HANDLE_T *handl
 {
     int r = iofunc_open_default(ctp, msg, handle, extra);
     if (r == EACCES) {
+        /* Counted always, logged rarely and only to memory: an AI that spams
+         * refused opens must not be able to slow this high-priority thread
+         * down with disk writes. */
         uint32_t n = atomic_fetch_add(&hw.denied_opens, 1) + 1;
-        struct _client_info ci;
-        int uid = -1;
-        if (ConnectClientInfo(ctp->info.scoid, &ci, 0) != -1) uid = (int)ci.cred.euid;
-        qlog(TAG, "open refused by the OS (uid %d, pid %d): %u so far", uid, (int)ctp->info.pid, n);
+        if (n == 1 || n % 64 == 0) {
+            struct _client_info ci;
+            int uid = -1;
+            if (ConnectClientInfo(ctp->info.scoid, &ci, 0) != -1) uid = (int)ci.cred.euid;
+            qlog_rt(TAG, "open refused by the OS (uid %d, pid %d): %u so far", uid, (int)ctp->info.pid, n);
+        }
     }
     return r;
 }

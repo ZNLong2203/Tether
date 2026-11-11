@@ -94,7 +94,10 @@ typedef struct {
     uint64_t wake_count;
     int64_t wake_p50_ns, wake_p99_ns, wake_p999_ns, wake_max_ns;
     int64_t exec_p99_ns, exec_max_ns;
-    uint32_t ai_restarts, hw_watchdog_trips, hw_denied_opens, pad;
+    uint32_t ai_restarts, hw_watchdog_trips, hw_denied_opens;
+    uint32_t guard_off; /* 1 while the arbiter is in demo pass-through (no runtime assurance) */
+    uint32_t pad2;
+    uint64_t ctl_overruns; /* control ticks skipped because the loop fell more than 10 periods behind */
     uint64_t event_seq; /* total switch events so far */
     tether_switch_event events[TETHER_EVENT_LOG]; /* events[(event_seq-1-i) % N] newest first */
 } tether_status;

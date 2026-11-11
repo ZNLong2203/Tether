@@ -247,8 +247,8 @@ int tether_status_json(const tether_status *s, char *buf, size_t len)
        (unsigned long long)s->wake_count, (long long)s->wake_p50_ns, (long long)s->wake_p99_ns,
        (long long)s->wake_p999_ns, (long long)s->wake_max_ns);
     jp(&j, "\"exec\":{\"p99_ns\":%lld,\"max_ns\":%lld},", (long long)s->exec_p99_ns, (long long)s->exec_max_ns);
-    jp(&j, "\"ai_restarts\":%u,\"hw_watchdog_trips\":%u,\"hw_denied_opens\":%u,\"event_seq\":%llu,\"events\":[",
-       s->ai_restarts, s->hw_watchdog_trips, s->hw_denied_opens, (unsigned long long)s->event_seq);
+    jp(&j, "\"ctl_overruns\":%llu,\"guard_off\":%u,\"ai_restarts\":%u,\"hw_watchdog_trips\":%u,\"hw_denied_opens\":%u,\"event_seq\":%llu,\"events\":[",
+       (unsigned long long)s->ctl_overruns, s->guard_off, s->ai_restarts, s->hw_watchdog_trips, s->hw_denied_opens, (unsigned long long)s->event_seq);
     uint64_t n = s->event_seq < TETHER_EVENT_LOG ? s->event_seq : TETHER_EVENT_LOG;
     for (uint64_t i = 0; i < n; i++) {
         const tether_switch_event *e = &s->events[i];

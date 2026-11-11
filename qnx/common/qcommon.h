@@ -13,18 +13,26 @@
 #include <string.h>
 #include "tether/config.h"
 
-/* Thread priorities (SCHED_FIFO). The control loop outranks everything the
- * AI can reach; the AI outranks only the dashboard. */
+/* Thread priorities (SCHED_FIFO). The control loop outranks everything the AI
+ * can reach. The dashboard outranks the AI so it stays usable while the AI
+ * saturates the CPUs; the AI's own control thread outranks its hog threads so
+ * a fault can always be cleared. */
 #define TETHER_PRIO_CONTROL 60
 #define TETHER_PRIO_HW_RESMGR 58
 #define TETHER_PRIO_HW_PHYSICS 56
 #define TETHER_PRIO_ARB_IPC 50
 #define TETHER_PRIO_SUPERVISOR 40
-#define TETHER_PRIO_AI 30
-#define TETHER_PRIO_BRIDGE 20
+#define TETHER_PRIO_LOGGER 35
+#define TETHER_PRIO_BRIDGE 25
+#define TETHER_PRIO_AI_CTRL 22
+#define TETHER_PRIO_AI 20
 
 /* Logs one line to stderr and to the "tether" slog2 buffer set. */
 void qlog(const char *tag, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+
+/* Same, but only to slog2 (memory-backed): no file or terminal I/O, so it is safe
+ * to call from a high-priority thread that must never wait on a slow driver. */
+void qlog_rt(const char *tag, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
 /* Consumes one --key=value option that changes the shared configuration
  * (--control-hz, --ai-hz, --plant-hz, --max-age-ms, --readmit-ticks,

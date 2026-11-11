@@ -44,6 +44,17 @@ void qlog(const char *tag, const char *fmt, ...)
     if (g_slog != NULL) slog2f(g_slog, 0, SLOG2_INFO, "%s: %s", tag, msg);
 }
 
+void qlog_rt(const char *tag, const char *fmt, ...)
+{
+    char msg[200];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+    pthread_once(&g_slog_once, slog_init);
+    if (g_slog != NULL) slog2f(g_slog, 0, SLOG2_INFO, "%s: %s", tag, msg);
+}
+
 static int opt_val(const char *arg, const char *key, double *out)
 {
     size_t n = strlen(key);
